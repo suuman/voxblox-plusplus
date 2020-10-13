@@ -30,6 +30,9 @@
 #include <voxblox_ros/mesh_vis.h>
 #include "global_segment_map_node/conversions.h"
 
+#include <nlohmann/json.hpp>
+
+
 #ifdef APPROXMVBB_AVAILABLE
 #include <ApproxMVBB/ComputeApproxMVBB.hpp>
 #endif
@@ -137,7 +140,10 @@ Controller::Controller(ros::NodeHandle* node_handle_private)
       publish_object_bbox_(false),
       use_label_propagation_(true) {
   CHECK_NOTNULL(node_handle_private_);
-
+   received_last_message_ = false;
+   map_gen_notdone_ = true;
+   ecount = 0;
+   lasttimestamp = 0;
   bool verbose_log = false;
   node_handle_private_->param<bool>("debug/verbose_log", verbose_log,
                                     verbose_log);
@@ -321,6 +327,14 @@ Controller::Controller(ros::NodeHandle* node_handle_private)
 }
 
 Controller::~Controller() { viz_thread_.join(); }
+
+void Controller::subscribeframeTsTopic(ros::Subscriber* frame_ts_sub){
+    *frame_ts_sub = node_handle_private_->subscribe("/ts", 10, &Controller::nimgscallback, this);
+}
+
+void Controller::subscribeEndOfSeqTopic(ros::Subscriber* endofSeq_sub){
+    *endofSeq_sub = node_handle_private_->subscribe("/genObjMap", 10, &Controller::endofsequencecallback, this);
+}
 
 void Controller::subscribeSegmentPointCloudTopic(
     ros::Subscriber* segment_point_cloud_sub) {
@@ -560,6 +574,10 @@ void Controller::integrateFrame(ros::Time msg_timestamp) {
             << " seconds.";
 
   LOG(INFO) << "Timings: " << std::endl << timing::Timing::Print() << std::endl;
+
+  LOG(INFO)<<" Processed "<<integrated_frames_count_<<" Frames"<<std::endl;
+
+
 }
 
 void Controller::segmentPointCloudCallback(
@@ -575,16 +593,57 @@ void Controller::segmentPointCloudCallback(
   // integrated.
   if (received_first_message_ &&
       last_segment_msg_timestamp_ != segment_point_cloud_msg->header.stamp) {
+      ecount = 0;
     if (segments_to_integrate_.size() > 0u) {
       integrateFrame(segment_point_cloud_msg->header.stamp);
     } else {
       LOG(INFO) << "No segments to integrate.";
     }
+  //  LOG(INFO)<<"count = "<<ecount<<std::endl;
+    ecount++;
+
+
+
   }
+
+
+  if(segment_point_cloud_msg->header.stamp == ros::Time(lasttimestamp))
+      received_last_message_ = true;
+
+
   received_first_message_ = true;
+
   last_segment_msg_timestamp_ = segment_point_cloud_msg->header.stamp;
 
   processSegment(segment_point_cloud_msg);
+
+  if(received_last_message_ & map_gen_notdone_){
+      if(publish_scene_mesh_) {
+          LOG(INFO)<<"Generating Mesh ..... "<<std::endl;
+          Controller::generateMesh(true); }
+      LOG(INFO)<<"Generating Cuboids ..... "<<std::endl;
+      getCuboids();
+      LOG(INFO)<<"Done Generating"<<std::endl;
+      received_last_message_ = false;
+      map_gen_notdone_ = false;
+      LOG(INFO)<<"Mapping Completed"<<std::endl;
+  }
+
+}
+
+void Controller::endofsequencecallback(const std_msgs::Int8::ConstPtr& msg)
+{
+ if(msg->data ==1)
+     lasttimestamp = nimgs;
+
+ LOG(INFO)<<"End of Sequence signalled with ts = "<<ros::Time(lasttimestamp)<<std::endl;
+}
+void Controller::nimgscallback(const std_msgs::Float64::ConstPtr& msg){
+
+nimgs = msg->data;
+
+LOG(INFO)<<(int(nimgs*1000000))<<" images received     current ts = "<< ros::Time(nimgs) <<"  "<<ros::Time(lasttimestamp)<<std::endl;
+
 }
 
 void Controller::resetMeshIntegrators() {
@@ -620,6 +679,8 @@ bool Controller::resetMapCallback(std_srvs::Empty::Request& /*request*/,
   // Reset counters and flags.
   integrated_frames_count_ = 0u;
   received_first_message_ = false;
+  map_gen_notdone_ = true;
+  received_last_message_ = false;
   {
     std::lock_guard<std::mutex> label_tsdf_layers_lock(
         label_tsdf_layers_mutex_);
@@ -758,6 +819,90 @@ bool Controller::saveSegmentsAsMeshCallback(
   }
 
   return overall_success;
+}
+
+
+void Controller::getCuboids(){
+
+    SemanticLabels semantic_labels;
+    std::unordered_map<InstanceLabel, LabelTsdfMap::LayerPair> instance_label_to_layers;
+    nlohmann::json objectmap;
+    objectmap["objects"] = nlohmann::json::array();
+    InstanceLabels instance_ids;
+    {
+      std::lock_guard<std::mutex> label_tsdf_layers_lock(
+          label_tsdf_layers_mutex_);
+      // Get list of instances and their corresponding semantic category.
+      map_->getSemanticInstanceList(&instance_ids, &semantic_labels);
+    }
+    LOG(INFO)<<"Semantics = "<<semantic_labels.size()<<"  Instance = "<<instance_ids.size()<<std::endl;
+    // Map class id to human-readable semantic category label.
+
+
+    bool kSaveSegmentsAsPly = false;
+    extractInstanceSegments(instance_ids, kSaveSegmentsAsPly,
+                            &instance_label_to_layers);
+    unsigned int idx = 0;
+    for (const InstanceLabel instance_label : instance_ids) {
+         nlohmann::json objinst;
+        SemanticLabel semantic_label = semantic_labels.at(idx++);
+        LOG(INFO)<<idx+1 <<" Semantics Label = "<<(unsigned) semantic_label<<"  Instance Label = "<<instance_label<<std::endl;
+
+            auto it = instance_label_to_layers.find(instance_label);
+            CHECK(it != instance_label_to_layers.end())
+                << "Layers for instance label " << instance_label
+                << " could not be extracted.";
+
+            const Layer<TsdfVoxel>& segment_tsdf_layer = it->second.first;
+
+            pcl::PointCloud<pcl::PointSurfel>::Ptr instance_pointcloud(
+                new pcl::PointCloud<pcl::PointSurfel>);
+
+            convertVoxelGridToPointCloud(segment_tsdf_layer, mesh_config_,
+                                         instance_pointcloud.get());
+
+
+
+          if(instance_pointcloud->size()>1){
+            Eigen::Vector3f bbox_translation;
+            Eigen::Quaternionf bbox_quaternion;
+            Eigen::Vector3f bbox_size;
+            Eigen::Vector3f centroid;
+            Eigen::Vector3f extent;
+            try{
+               computeAlignedBoundingBox(instance_pointcloud, &bbox_translation,
+                                      &bbox_quaternion, &bbox_size);
+               computeAxisAlignedBoundingBox(instance_pointcloud, &centroid,
+                                              &extent);
+            }
+            catch(int e){
+
+               LOG(INFO)<<"exeption in reading Cuboid"<<std::endl;
+               continue;
+            }
+            if(bbox_size.size()>0){
+
+            objinst["class"] = classes[(unsigned)semantic_label];
+            objinst["position"] = {centroid(0), centroid(1), centroid(2) };
+            objinst["dimension"] = {extent(0), extent(1), extent(2) };
+            objinst["centroid"] = {bbox_translation(0), bbox_translation(1), bbox_translation(2) };
+            objinst["extent"] = {bbox_size(0), bbox_size(1), bbox_size(2) };
+            objinst["orientation"] = {bbox_quaternion.x(), bbox_quaternion.y(), bbox_quaternion.z(), bbox_quaternion.w()};
+            objectmap["objects"].push_back(objinst);
+
+
+            LOG(INFO)<< classes[(unsigned)semantic_label]<<"\t Position : ( "<<bbox_translation(0)<<" "<<bbox_translation(1)<<" "<<bbox_translation(2)<<" )  "
+                                                          <<"Orientation : ( "<<bbox_quaternion.x()<<" "<<bbox_quaternion.y()<<" "<<bbox_quaternion.z()<<" "<<bbox_quaternion.w()<<" )  "
+                                                          <<"Dimensions : ( "<< bbox_size(0)<<" "<<bbox_size(1)<<" "<<bbox_size(2)<<" )"<<std::endl;
+            }
+          }
+
+
+
+    }
+     std::ofstream file("objectmap.json");
+     file << std::setw(1) <<objectmap<<std::endl;
+
 }
 
 bool Controller::getListSemanticInstancesCallback(
@@ -1041,6 +1186,31 @@ void Controller::updateMeshEvent(const ros::TimerEvent& e) {
   }
 }
 
+void Controller::computeAxisAlignedBoundingBox(
+    const pcl::PointCloud<pcl::PointSurfel>::Ptr surfel_cloud,
+    Eigen::Vector3f* bbox_translation, Eigen::Vector3f* bbox_size) {
+  CHECK(surfel_cloud);
+  CHECK_NOTNULL(bbox_size);
+  std::vector<double> X(surfel_cloud->points.size());
+  std::vector<double> Y(surfel_cloud->points.size());
+  std::vector<double> Z(surfel_cloud->points.size());
+
+  for (size_t i = 0u; i < surfel_cloud->points.size(); ++i) {
+    X[i] = double(surfel_cloud->points.at(i).x);
+    Y[i] = double(surfel_cloud->points.at(i).y);
+    Z[i] = double(surfel_cloud->points.at(i).z);
+  }
+
+  const auto [minX, maxX] = std::minmax_element(X.begin(), X.end());
+  const auto [minY, maxY] = std::minmax_element(Y.begin(), Y.end());
+  const auto [minZ, maxZ] = std::minmax_element(Z.begin(), Z.end());
+
+
+  *bbox_translation = Eigen::Vector3f((*minX + *maxX)/2.0, (*minY + *maxY)/2.0, (*minZ + *maxZ)/2.0);
+  *bbox_size = Eigen::Vector3f(*maxX - *minX, *maxY - *minY, *maxZ - *minZ);
+
+}
+
 void Controller::computeAlignedBoundingBox(
     const pcl::PointCloud<pcl::PointSurfel>::Ptr surfel_cloud,
     Eigen::Vector3f* bbox_translation, Eigen::Quaternionf* bbox_quaternion,
@@ -1049,6 +1219,8 @@ void Controller::computeAlignedBoundingBox(
   CHECK_NOTNULL(bbox_translation);
   CHECK_NOTNULL(bbox_quaternion);
   CHECK_NOTNULL(bbox_size);
+
+
 #ifdef APPROXMVBB_AVAILABLE
   ApproxMVBB::Matrix3Dyn points(3, surfel_cloud->points.size());
 

@@ -33,6 +33,12 @@ int main(int argc, char** argv) {
   ros::Subscriber segment_point_cloud_sub;
   controller->subscribeSegmentPointCloudTopic(&segment_point_cloud_sub);
 
+  ros::Subscriber frame_ts_sub;
+  controller->subscribeframeTsTopic(&frame_ts_sub);
+
+  ros::Subscriber endofSeq_sub;
+  controller->subscribeEndOfSeqTopic(&endofSeq_sub);
+
   if (controller->publish_scene_map_) {
     controller->advertiseMapTopic();
   }
@@ -73,6 +79,7 @@ int main(int argc, char** argv) {
   // Spinner that uses a number of threads equal to the number of cores.
   ros::AsyncSpinner spinner(0);
   spinner.start();
+
   ros::waitForShutdown();
 
   LOG(INFO) << "Shutting down.";

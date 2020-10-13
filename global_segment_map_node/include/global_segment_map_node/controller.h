@@ -24,7 +24,8 @@
 #include <vpp_msgs/GetListSemanticInstances.h>
 #include <vpp_msgs/GetMap.h>
 #include <vpp_msgs/GetScenePointcloud.h>
-
+#include <std_msgs/Float64.h>
+#include <std_msgs/Int8.h>
 namespace voxblox {
 namespace voxblox_gsm {
 
@@ -38,6 +39,9 @@ class Controller {
 
   void subscribeSegmentPointCloudTopic(
       ros::Subscriber* segment_point_cloud_sub);
+  
+  void subscribeframeTsTopic(ros::Subscriber* frame_ts_sub);
+  void subscribeEndOfSeqTopic(ros::Subscriber* endofSeq_sub);
 
   void advertiseMapTopic();
 
@@ -76,7 +80,7 @@ class Controller {
   bool publish_scene_map_;
   bool publish_scene_mesh_;
   bool publish_object_bbox_;
-
+  bool map_gen_notdone_;
   bool use_label_propagation_;
 
  protected:
@@ -93,6 +97,9 @@ class Controller {
 
   virtual void segmentPointCloudCallback(
       const sensor_msgs::PointCloud2::Ptr& segment_point_cloud_msg);
+
+  void nimgscallback(const std_msgs::Float64::ConstPtr& msg);
+  void endofsequencecallback(const std_msgs::Int8::ConstPtr& msg);
 
   bool getMapCallback(vpp_msgs::GetMap::Request& /* request */,
                       vpp_msgs::GetMap::Response& response);
@@ -123,6 +130,7 @@ class Controller {
                        Transformation* transform);
 
   void generateMesh(bool clear_mesh);
+  void getCuboids();
 
   void updateMeshEvent(const ros::TimerEvent& e);
 
@@ -134,10 +142,16 @@ class Controller {
       Eigen::Vector3f* bbox_translation, Eigen::Quaternionf* bbox_quaternion,
       Eigen::Vector3f* bbox_size);
 
+  void computeAxisAlignedBoundingBox(
+      const pcl::PointCloud<pcl::PointSurfel>::Ptr surfel_cloud,
+      Eigen::Vector3f* bbox_translation, Eigen::Vector3f* bbox_size);
+
   void extractInstanceSegments(
       InstanceLabels instance_labels, bool save_segments_as_ply,
       std::unordered_map<InstanceLabel, LabelTsdfMap::LayerPair>*
           instance_label_to_layers);
+
+
 
   ros::NodeHandle* node_handle_private_;
 
@@ -150,6 +164,10 @@ class Controller {
 
   bool integration_on_;
   bool received_first_message_;
+  float nimgs;
+  bool received_last_message_;
+  int ecount;
+  float lasttimestamp;
 
   LabelTsdfMap::Config map_config_;
   LabelTsdfIntegrator::Config tsdf_integrator_config_;

@@ -7,4 +7,5 @@
     <rosparam command="load" file="$(find gsm_node)/cfg/$(arg scene_name).yaml" />
     <param name="meshing/visualize" value="$(arg visualize)" />
   </node>
+
 </launch>

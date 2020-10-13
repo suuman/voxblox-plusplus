@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.10.0)
 project(gsm_node)
 
 add_definitions(-std=c++14)
@@ -9,7 +9,7 @@ endif()
 find_package(catkin_simple REQUIRED)
 catkin_simple(ALL_DEPS_REQUIRED)
 
-set(WITH_APPROXMVBB OFF)
+set(WITH_APPROXMVBB ON)
 
 if (WITH_APPROXMVBB)
   if(${CMAKE_VERSION} VERSION_LESS "3.8.0")

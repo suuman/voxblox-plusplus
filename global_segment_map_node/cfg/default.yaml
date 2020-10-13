@@ -20,17 +20,17 @@ pairwise_confidence_merging:
   merging_min_frame_count: 2
 
 semantic_instance_segmentation:
-  enable_semantic_instance_segmentation: false
+  enable_semantic_instance_segmentation: true
   class_tsdk: "coco80"
 
 publishers:
   publish_scene_map: true
   publish_scene_mesh: true
-  publish_object_bbox: false
+  publish_object_bbox: true
 
 meshing:
-  visualize: false
-  update_mesh_every_n_sec: 0.0
+  visualize: true
+  update_mesh_every_n_sec: 1.0
   mesh_filename: "vpp_mesh.ply"
   visualizer_parameters:
     camera_position: [-0.73071,  1.35896,   6.98444,  # Position - x y z
@@ -43,6 +43,6 @@ icp:
   keep_track_of_icp_correction: true
 
 debug:
-  verbose_log: false
+  verbose_log: true
   multiple_visualizers: false
   save_visualizer_frames: false
