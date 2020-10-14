@@ -883,10 +883,10 @@ void Controller::getCuboids(){
             if(bbox_size.size()>0){
 
             objinst["class"] = classes[(unsigned)semantic_label];
-            objinst["position"] = {centroid(0), centroid(1), centroid(2) };
-            objinst["dimension"] = {extent(0), extent(1), extent(2) };
-            objinst["centroid"] = {bbox_translation(0), bbox_translation(1), bbox_translation(2) };
-            objinst["extent"] = {bbox_size(0), bbox_size(1), bbox_size(2) };
+            objinst["centroid"] = {centroid(0), centroid(1), centroid(2) };
+            objinst["extent"] = {extent(0), extent(1), extent(2) };
+            objinst["location"] = {bbox_translation(0), bbox_translation(1), bbox_translation(2) };
+            objinst["dimension"] = {bbox_size(0), bbox_size(1), bbox_size(2) };
             objinst["orientation"] = {bbox_quaternion.x(), bbox_quaternion.y(), bbox_quaternion.z(), bbox_quaternion.w()};
             objectmap["objects"].push_back(objinst);
 
