@@ -21,9 +21,7 @@ from mask_rcnn_ros.msg import Result
 import segvisualize as visualize
 import matplotlib.pyplot as plt
 
-CLASS_NAMES = ['background', 'floor', 'wall', 'ceiling', 'roof', 'door', 'window', 'ventilation', 
-               'light', 'light plane', 'curtain', 'carpet', 'cabinet', 'pictures', 'binders', 
-               'printer', 'locker', 'bottle', 'cup', 'knife', 'bowl', 'wine glass', 'fork', 
+CLASS_NAMES = ['background', 'bottle', 'cup', 'knife', 'bowl', 'wine glass', 'fork', 
                'spoon', 'banana', 'apple', 'orange', 'cake', 'potted plant', 'mouse', 'keyboard', 
                'laptop', 'cell phone', 'book', 'clock', 'chair', 'table', 'couch', 'bed', 'toilet', 
                'tv', 'microwave', 'toaster', 'refrigerator', 'oven', 'sink', 'person', 'moniter', 'sofa']
@@ -294,16 +292,15 @@ class BenchBotRos:
 
 if __name__ == '__main__':
 
-    #fold = '/media/suman/data/dataset/AI_vol3_03/miniroom1'
-    fold = '/media/suman/DATA/challange_datasets/AIUE_V01_001/apartment3'
-    #fold = '/media/suman/DATA/challange_datasets/AIUE_V01_003/office3'
-    #fold = '/media/suman/DATA/challange_datasets/AIUE_V01_005/company3'
+
+    fold = '/media/suman/data/benchbot_ws/dataset/miniroom_1'
+
 
     rgb_ims = [f for f in sorted(glob.glob(fold + "/image/*.png"))]
-    depth_ims = [f for f in sorted(glob.glob(fold + "/depth/*.png"))]
+    depth_ims = [f for f in sorted(glob.glob(fold + "/depth/*.tiff"))]
     gt_poses = [f for f in sorted(glob.glob(fold + "/poses/*.json"))]
-    mask_ims = [f for f in sorted(glob.glob(fold + "/gtseg/*.png"))]
-    rois_2ds = [f for f in sorted(glob.glob(fold + "/gt_masks/*.json"))]
+    mask_ims = [f for f in sorted(glob.glob(fold + "/instseg/*.png"))]
+    #rois_2ds = [f for f in sorted(glob.glob(fold + "/gt_masks/*.json"))]
     fac = 1
     
     nimgs = len(rgb_ims)

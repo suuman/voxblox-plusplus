@@ -1,0 +1,12 @@
+<launch>
+
+  <arg name="visualize" default="true" />
+
+  <include file="$(find gsm_node)/launch/vpp_pipeline_offline.launch">
+    <arg name="scene_name" value="benchbot" />
+    <arg name="sensor_name" value="primesense" />
+    <arg name="visualize" value="$(arg visualize)" />
+  </include>
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find gsm_node)/rviz/benchbot.rviz"/>
+
+</launch>

@@ -41,7 +41,7 @@ namespace voxblox {
 namespace voxblox_gsm {
 
 // TODO(ntonci): Move this to a separate header.
-std::string classes[81] = {"BG",
+std::string classes_coco[81] = {"BG",
                            "person",
                            "bicycle",
                            "car",
@@ -123,6 +123,15 @@ std::string classes[81] = {"BG",
                            "hair drier",
                            "toothbrush"};
 
+std::string classes_benchbot[49] = {"background", "floor", "wall", "ceiling", "roof", "door", "window", "ventilation", 
+               "light", "light plane", "curtain", "carpet", "cabinet", "pictures", "binders", 
+               "printer", "locker", "bottle", "cup", "knife", "bowl", "wine glass", "fork", 
+               "spoon", "banana", "apple", "orange", "cake", "potted plant", "mouse", "keyboard", 
+               "laptop", "cell phone", "book", "clock", "chair", "table", "couch", "bed", "toilet", 
+               "tv", "microwave", "toaster", "refrigerator", "oven", "sink", "person", "moniter", "sofa"};
+
+std::string *classes;
+
 Controller::Controller(ros::NodeHandle* node_handle_private)
     : node_handle_private_(node_handle_private),
       // Increased time limit for lookup in the past of tf messages
@@ -147,6 +156,7 @@ Controller::Controller(ros::NodeHandle* node_handle_private)
   bool verbose_log = false;
   node_handle_private_->param<bool>("debug/verbose_log", verbose_log,
                                     verbose_log);
+   classes = classes_coco;
 
   if (verbose_log) {
     FLAGS_stderrthreshold = 0;
@@ -633,8 +643,15 @@ void Controller::segmentPointCloudCallback(
 
 void Controller::endofsequencecallback(const std_msgs::Int8::ConstPtr& msg)
 {
- if(msg->data ==1)
+ if(msg->data ==1){
      lasttimestamp = nimgs;
+     classes = classes_coco;
+}
+else if(msg->data ==2){
+        lasttimestamp = nimgs;
+        classes = classes_benchbot;
+
+}
 
  LOG(INFO)<<"End of Sequence signalled with ts = "<<ros::Time(lasttimestamp)<<std::endl;
 }

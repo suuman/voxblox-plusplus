@@ -21,12 +21,83 @@ from mask_rcnn_ros.msg import Result
 import segvisualize as visualize
 import matplotlib.pyplot as plt
 
-CLASS_NAMES = ['background', 'floor', 'wall', 'ceiling', 'roof', 'door', 'window', 'ventilation', 
-               'light', 'light plane', 'curtain', 'carpet', 'cabinet', 'pictures', 'binders', 
-               'printer', 'locker', 'bottle', 'cup', 'knife', 'bowl', 'wine glass', 'fork', 
-               'spoon', 'banana', 'apple', 'orange', 'cake', 'potted plant', 'mouse', 'keyboard', 
-               'laptop', 'cell phone', 'book', 'clock', 'chair', 'table', 'couch', 'bed', 'toilet', 
-               'tv', 'microwave', 'toaster', 'refrigerator', 'oven', 'sink', 'person', 'moniter', 'sofa']
+CLASS_NAMES = ['BG', 'person', 'bicycle', 'car', 'motorcycle',
+                           'airplane',
+                           'bus',
+                           'train',
+                           'truck',
+                           'boat',
+                           'traffic light',
+                           'fire hydrant',
+                           'stop sign',
+                           'parking meter',
+                           'bench',
+                           'bird',
+                           'cat',
+                           'dog',
+                           'horse',
+                           'sheep',
+                           'cow',
+                           'elephant',
+                           'bear',
+                           'zebra',
+                           'giraffe',
+                           'backpack',
+                           'umbrella',
+                           'handbag',
+                           'tie',
+                           'suitcase',
+                           'frisbee',
+                           'skis',
+                           'snowboard',
+                           'sports ball',
+                           'kite',
+                           'baseball bat',
+                           'baseball glove',
+                           'skateboard',
+                           'surfboard',
+                           'tennis racket',
+                           'bottle',
+                           'wine glass',
+                           'cup',
+                           'fork',
+                           'knife',
+                           'spoon',
+                           'bowl',
+                           'banana',
+                           'apple',
+                           'sandwich',
+                           'orange',
+                           'broccoli',
+                           'carrot',
+                           'hot dog',
+                           'pizza',
+                           'donut',
+                           'cake',
+                           'chair',
+                           'couch',
+                           'potted plant',
+                           'bed',
+                           'dining table',
+                           'toilet',
+                           'tv',
+                           'laptop',
+                           'mouse',
+                           'remote',
+                           'keyboard',
+                           'cell phone',
+                           'microwave',
+                           'oven',
+                           'toaster',
+                           'sink',
+                           'refrigerator',
+                           'book',
+                           'clock',
+                           'vase',
+                           'scissors',
+                           'teddy bear',
+                           'hair drier',
+                           'toothbrush']
 
 class BenchBotRos:
 
@@ -236,7 +307,7 @@ class BenchBotRos:
        
     
     def publishEndflag(self):
-        self.end_info.publish(2)
+        self.end_info.publish(1)
     
 
     def spin(self):
@@ -244,6 +315,15 @@ class BenchBotRos:
     
     def getMasks(self, rois, mask_im):
         ndets = len(rois)
+        if(ndets==6):
+            if(rois.ndim==1):
+                ndets = 1
+                rois = np.array([rois])
+                #print(rois)
+        
+        print("ndets = ", ndets)
+            
+ 
         h = 540
         w = 960
         idlist = []
@@ -261,23 +341,43 @@ class BenchBotRos:
         
 
         for i in range(ndets):
-            classname = rois[i]['class']
-            x1, y1, x2, y2 = rois[i]['bounding_box']
+
+          
+
+
+            x1 = int(rois[i,0])
+            y1 = int(rois[i,1])
+            x2 = int(rois[i,0]+rois[i,2])
+            y2 = int(rois[i,1]+rois[i,3])
+            if(y2>=540):
+                y2 = 539
+            if(x2>=960):
+                x2 = 959
+            if(x1<1):
+                x1=0
+            if(y1<1):
+                y1 = 0
+
+            
+            
             bb2D[i,0] = y1
             bb2D[i,1] = x1
             bb2D[i,2] = y2
             bb2D[i,3] = x2
+            #print(bb2D)
+
+
 
             #print(classname, CLASS_NAMES.index(classname),  y1, x1, y2, x2 )
 
-            idx = CLASS_NAMES.index(classname)
+            idx= rois[i, 5]
             classids[i] = idx
-            scores[i] = 1.0
+            scores[i] = rois[i,4]
 
             for y in range(y1,y2+1):
                 for x in range(x1, x2+1):
                     cid = mask_im[y,x]
-                    if(cid == idx):
+                    if(cid == i+1):
                         masks[y,x,i] = 1
             
             
@@ -294,16 +394,14 @@ class BenchBotRos:
 
 if __name__ == '__main__':
 
-    #fold = '/media/suman/data/dataset/AI_vol3_03/miniroom1'
-    fold = '/media/suman/DATA/challange_datasets/AIUE_V01_001/apartment3'
-    #fold = '/media/suman/DATA/challange_datasets/AIUE_V01_003/office3'
-    #fold = '/media/suman/DATA/challange_datasets/AIUE_V01_005/company3'
+
+    fold = '/media/suman/data/benchbot_ws/dataset_pGT/office_3'
 
     rgb_ims = [f for f in sorted(glob.glob(fold + "/image/*.png"))]
-    depth_ims = [f for f in sorted(glob.glob(fold + "/depth/*.png"))]
-    gt_poses = [f for f in sorted(glob.glob(fold + "/poses/*.json"))]
-    mask_ims = [f for f in sorted(glob.glob(fold + "/gtseg/*.png"))]
-    rois_2ds = [f for f in sorted(glob.glob(fold + "/gt_masks/*.json"))]
+    depth_ims = [f for f in sorted(glob.glob(fold + "/depth/*.tiff"))]
+    gt_poses = [f for f in sorted(glob.glob(fold + "/poses_est/*.json"))]
+    mask_ims = [f for f in sorted(glob.glob(fold + "/mask_est/*.png"))]
+    rois_2ds = [f for f in sorted(glob.glob(fold + "/mask_est/*.txt"))]
     fac = 1
     
     nimgs = len(rgb_ims)
@@ -311,7 +409,7 @@ if __name__ == '__main__':
 
 
     BB = BenchBotRos()
-    #print(BB._class_names)
+    print(BB._class_names)
 
     rate = rospy.Rate(0.5)
     imcount = 0
@@ -326,14 +424,15 @@ if __name__ == '__main__':
 
         bgr_image = cv2.imread(rgb_ims[i], cv2.IMREAD_UNCHANGED)
         depth_image = cv2.imread(depth_ims[i], cv2.IMREAD_UNCHANGED)
-        depth_image = depth_image.astype(np.float32)/255.0
+        depth_image = depth_image.astype(np.float32)
         imcount = imcount + 1
 
         with open(gt_poses[i]) as posefile:
             curr_pose = json.load(posefile)[0] 
         
         with open(rois_2ds[i]) as roisfile:
-            rois = json.load(roisfile)
+            rois = np.loadtxt(roisfile)
+            #print(rois.ndim)
         
         maskim = cv2.imread(mask_ims[i], cv2.IMREAD_UNCHANGED)
         
@@ -346,6 +445,7 @@ if __name__ == '__main__':
         if(i==0):
             rate.sleep()
             rate.sleep()
+            
         elif(imcount==nimgss-1):
             BB.publishEndflag()
         else:
