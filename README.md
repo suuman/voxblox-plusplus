@@ -1,9 +1,11 @@
 ## About this fork
 * Modified to work with custom RGB-D datasets with known Poses.
+* Can run online with BenchBot System (https://github.com/qcr/benchbo.git)
 * Example Script to publish data publish_data/benchbot_ros.py 
 * Saves maps in ${HOME}/.ros at the end.
 * Saves Axis-aligned Cuboids of all semantic instances in the map automatically at the end in ${HOME}/.ros/objectmap.json
 * Warning: Just hacky solution .. works for my case. !! Use at your own risk !!
+* Uses depth_segmentation from this fork https://github.com/suuman/depth_segmentation_benchbot.git
 
 ##
 # Voxblox++
